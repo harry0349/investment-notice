@@ -139,6 +139,7 @@ async fn fetch_from_alpha_vantage() -> Result<Vec<StockData>> {
 
         if let Some(obj) = time_series.as_object() {
             for (date_str, values) in obj {
+                #[allow(clippy::collapsible_if)]
                 if let Ok(date) = DateTime::parse_from_str(
                     &format!("{} 00:00:00 +0000", date_str),
                     "%Y-%m-%d %H:%M:%S %z",
