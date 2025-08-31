@@ -65,7 +65,8 @@ jobs:
 
       - name: Run daily analysis and send email
         env:
-          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER || 'smtp.gmail.com' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
           SMTP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
@@ -123,7 +124,8 @@ jobs:
 
       - name: Test email functionality
         env:
-          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER || 'smtp.gmail.com' }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
           SMTP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
