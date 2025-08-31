@@ -1,5 +1,5 @@
 use crate::models::{DailyAnalysis, MonthlyAnalysis, WeeklyAnalysis};
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
@@ -132,8 +132,13 @@ pub async fn generate_monthly_analysis(analysis: &MonthlyAnalysis) -> Result<Str
 
 /// Call Gemini API to generate response
 async fn generate_gemini_response(prompt: &str) -> Result<String> {
-    let api_key = std::env::var("GEMINI_API_KEY")
-        .map_err(|_| anyhow!("GEMINI_API_KEY environment variable not set"))?;
+    let api_key = match std::env::var("GEMINI_API_KEY") {
+        Ok(key) if !key.trim().is_empty() => key,
+        _ => {
+            warn!("GEMINI_API_KEY not set or empty, using fallback analysis");
+            return Ok("🔑 API Key Required\n\nGemini API key is not configured. To enable AI-powered analysis:\n\n1. Get a Gemini API key from: https://makersuite.google.com/app/apikey\n2. Set GEMINI_API_KEY environment variable\n3. Restart the application\n\nFor now, you'll receive basic market analysis.".to_string());
+        }
+    };
 
     debug!(
         "Sending request to Gemini API, prompt length: {} characters",
@@ -186,16 +191,14 @@ async fn generate_gemini_response(prompt: &str) -> Result<String> {
                 let status = resp.status();
                 let error_text = resp.text().await.unwrap_or_default();
                 warn!("Gemini API request failed: {} - {}", status, error_text);
-                Err(anyhow!(
-                    "Gemini API request failed: {} - {}",
-                    status,
-                    error_text
-                ))
+                // Return a fallback message instead of error to prevent program crash
+                Ok("⚠️ AI Analysis Unavailable\n\nThe Gemini API is currently not accessible. This could be due to:\n- API key not configured\n- API quota exceeded\n- Network connectivity issues\n\nPlease check your API configuration in the environment variables.".to_string())
             }
         }
         Err(e) => {
             warn!("Network request failed: {:?}", e);
-            Err(anyhow!("Network request failed: {}", e))
+            // Return a fallback message instead of error to prevent program crash
+            Ok("⚠️ AI Analysis Unavailable\n\nNetwork connection to Gemini API failed. This could be due to:\n- Internet connectivity issues\n- Firewall blocking the request\n- DNS resolution problems\n\nThe system will continue with basic analysis.".to_string())
         }
     }
 }
