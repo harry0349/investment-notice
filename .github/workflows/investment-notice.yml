@@ -1,0 +1,98 @@
+name: Investment Notice
+
+on:
+  schedule:
+    # 每个工作日晚上8点 (UTC时间)
+    - cron: "0 20 * * 1-5"
+    # 每周五晚上8点 (UTC时间，额外执行周总结)
+    - cron: "0 20 * * 5"
+    # 每月最后三天晚上8点 (UTC时间，覆盖月末工作日)
+    - cron: "0 20 28-31 * *"
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build project
+        run: cargo build --release
+
+      - name: Format code
+        run: cargo fmt --check
+
+      - name: Run Clippy
+        run: cargo clippy -- -D warnings
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Determine analysis mode
+        id: mode
+        run: |
+          # 获取当前日期信息
+          DAY_OF_MONTH=$(date +%d)
+          DAY_OF_WEEK=$(date +%u)  # 1=Monday, 7=Sunday
+
+          echo "Day of month: $DAY_OF_MONTH"
+          echo "Day of week: $DAY_OF_WEEK"
+
+          # 判断运行模式
+          if [ "$DAY_OF_WEEK" = "5" ]; then
+            # 周五：运行每周分析
+            echo "mode=weekly" >> $GITHUB_OUTPUT
+            echo "Running weekly analysis"
+          elif [ "$DAY_OF_MONTH" -ge 28 ] && [ "$DAY_OF_WEEK" -le 5 ]; then
+            # 月末工作日：运行每月分析
+            echo "mode=monthly" >> $GITHUB_OUTPUT
+            echo "Running monthly analysis"
+          else
+            # 普通工作日：运行每日分析
+            echo "mode=daily" >> $GITHUB_OUTPUT
+            echo "Running daily analysis"
+          fi
+
+      - name: Run Investment Analysis
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          TO_EMAILS: ${{ secrets.TO_EMAILS }}
+          RUST_LOG: info
+        run: |
+          echo "Running analysis in ${{ steps.mode.outputs.mode }} mode"
+          cargo run --release -- --mode ${{ steps.mode.outputs.mode }} --send-email
+
+  notify-on-failure:
+    runs-on: ubuntu-latest
+    needs: analyze
+    if: failure()
+
+    steps:
+      - name: Send failure notification
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { Octokit } = require('@octokit/rest');
+            const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+
+            await octokit.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `🚨 投资分析任务执行失败！请检查日志。`
+            });
