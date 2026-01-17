@@ -63,6 +63,7 @@ pub struct ApiResponse {
     pub message: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmailConfig {
     pub smtp_server: String,
@@ -73,6 +74,7 @@ pub struct EmailConfig {
     pub to_emails: Vec<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeminiConfig {
     pub api_key: String,
